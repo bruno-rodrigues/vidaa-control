@@ -224,19 +224,23 @@ class VidaaTV:
         if not saved_creds:
             # No saved credentials - need to generate or use static
             if use_dynamic_auth and mac_address:
-                # Generate fresh credentials for new pairing
-                creds = generate_credentials(
-                    mac_address=mac_address,
-                    brand=brand,
-                    auth_method=self._auth_method,
-                )
+                # LEGACY protocol TVs (< 3000) reject all dynamic credentials.
+                # They only accept the hardcoded static creds from the factory app.
+                if self._auth_method == AuthMethod.LEGACY:
+                    creds = generate_credentials_static(mac_address)
+                    _LOGGER.debug("Using static auth (LEGACY protocol): client_id=%s...", creds.client_id[:30])
+                else:
+                    creds = generate_credentials(
+                        mac_address=mac_address,
+                        brand=brand,
+                        auth_method=self._auth_method,
+                    )
+                    auth_label = self._auth_method.value if self._auth_method else "auto"
+                    _LOGGER.debug("Using dynamic auth (%s): client_id=%s...", auth_label, creds.client_id[:30])
                 self._mqtt_client_id = creds.client_id
                 self._username = creds.username
                 self._password = creds.password
-                # Use MQTT client_id for topics during pairing as well
                 self.client_id = creds.client_id
-                auth_label = self._auth_method.value if self._auth_method else "auto"
-                _LOGGER.debug("Using dynamic auth (%s): client_id=%s...", auth_label, creds.client_id[:30])
             else:
                 # Use static credentials
                 self._mqtt_client_id = f"hisense_{client_id}_{int(time.time())}"
